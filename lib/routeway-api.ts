@@ -1,4 +1,4 @@
-const API_KEY = "sk-7r7dL5pEUJvfXqx3M0G7GN9MPQotjQtDQ4EWWPa4DmzWI9fm"
+const API_KEY = "sk-kpF8Py3rIxM6ntFilq5Ago7ilnRpEoDJYOXoFBcMFPlwcHFi"
 const API_URL = "https://api.routeway.ai/v1/chat/completions"
 
 export type ModelType = "peyza-x2" | "peyza-x6" | "peyza-x12"
