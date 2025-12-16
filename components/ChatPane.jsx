@@ -117,11 +117,11 @@ const ChatPane = forwardRef(function ChatPane(
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col">
-      <div className="flex-1 space-y-5 overflow-y-auto px-4 py-6 sm:px-8">
-        <div className="mb-2 text-3xl font-serif tracking-tight sm:text-4xl md:text-5xl animate-in fade-in slide-in-from-top-4">
-          <span className="block leading-[1.05] font-sans text-2xl">{conversation.title}</span>
+      <div className="flex-1 space-y-5 overflow-y-auto px-3 py-4 sm:px-6 md:px-8 lg:px-10 xl:px-12">
+        <div className="mb-2 text-2xl font-serif tracking-tight sm:text-3xl md:text-4xl lg:text-5xl animate-in fade-in slide-in-from-top-4">
+          <span className="block leading-[1.05] font-sans">{conversation.title}</span>
         </div>
-        <div className="mb-4 text-sm text-zinc-500 dark:text-zinc-400 animate-in fade-in slide-in-from-top-4">
+        <div className="mb-4 text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 animate-in fade-in slide-in-from-top-4">
           Updated {timeAgo(conversation.updatedAt)} · {count} messages
         </div>
 
@@ -186,7 +186,7 @@ const ChatPane = forwardRef(function ChatPane(
                       messageId={m.id}
                       onRetry={m.role === "assistant" ? () => onResendMessage?.(m.id) : undefined}
                     >
-                      <div className="whitespace-pre-wrap">{m.content}</div>
+                      <div className="whitespace-pre-wrap">{m.content || "(empty message)"}</div>
                       {m.files && m.files.length > 0 && (
                         <div className="mt-2 flex flex-wrap gap-2">
                           {m.files.map((file, idx) => (
@@ -233,10 +233,24 @@ const ChatPane = forwardRef(function ChatPane(
       <Composer
         ref={composerRef}
         onSend={async (text, files, modes) => {
-          if (!text.trim() && (!files || files.length === 0)) return
+          console.log("[v0] ChatPane onSend received - text:", text)
+          console.log("[v0] ChatPane onSend received - files:", files)
+          console.log("[v0] ChatPane onSend received - modes:", modes)
+
+          const trimmedText = text?.trim() || ""
+
+          console.log("[v0] ChatPane onSend - trimmedText:", trimmedText)
+
+          if (!trimmedText && (!files || files.length === 0)) {
+            console.log("[v0] ChatPane onSend - early return, no content")
+            return
+          }
+
           setBusy(true)
           setCurrentModes(modes || { thinking: false, search: false })
-          await onSend?.(text, files, modes)
+
+          console.log("[v0] ChatPane onSend - calling parent onSend")
+          await onSend?.(trimmedText, files, modes)
           setBusy(false)
         }}
         busy={busy}

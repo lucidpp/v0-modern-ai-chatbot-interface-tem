@@ -40,33 +40,48 @@ export async function sendChatMessage(
   selectedModel: ModelType,
   onStream?: (chunk: string) => void,
 ): Promise<string> {
+  console.log("[v0] API sendChatMessage called:", { messages, selectedModel })
+
   try {
+    const requestBody = {
+      model: "kimi-k2-0905:free",
+      messages: [
+        {
+          role: "system",
+          content: `You are ${MODELS.find((m) => m.id === selectedModel)?.name}, an advanced AI assistant. You are helpful, friendly, and knowledgeable.`,
+        },
+        ...messages,
+      ],
+    }
+
+    console.log("[v0] API request body:", JSON.stringify(requestBody, null, 2))
+
     const response = await fetch(API_URL, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${API_KEY}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        model: "kimi-k2-0905:free",
-        messages: [
-          {
-            role: "system",
-            content: `You are ${MODELS.find((m) => m.id === selectedModel)?.name}, an advanced AI assistant. You are helpful, friendly, and knowledgeable.`,
-          },
-          ...messages,
-        ],
-      }),
+      body: JSON.stringify(requestBody),
     })
 
+    console.log("[v0] API response status:", response.status)
+
     if (!response.ok) {
-      throw new Error(`API error: ${response.status}`)
+      const errorText = await response.text()
+      console.error("[v0] API error response:", errorText)
+      throw new Error(`API error: ${response.status} - ${errorText}`)
     }
 
     const data = await response.json()
-    return data.choices[0]?.message?.content || "I'm sorry, I couldn't generate a response."
+    console.log("[v0] API response data:", data)
+
+    const content = data.choices[0]?.message?.content || "I'm sorry, I couldn't generate a response."
+    console.log("[v0] API extracted content:", content)
+
+    return content
   } catch (error) {
     console.error("[v0] Routeway API error:", error)
-    return "I'm having trouble connecting right now. Please try again."
+    throw error
   }
 }

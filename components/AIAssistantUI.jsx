@@ -13,7 +13,6 @@ import { INITIAL_CONVERSATIONS, INITIAL_TEMPLATES, INITIAL_FOLDERS } from "./moc
 import { sendChatMessage } from "@/lib/routeway-api"
 import { getUser, createUser } from "@/lib/auth"
 import { getCharacters } from "@/lib/characters"
-import { applyTheme } from "@/lib/themes"
 
 export default function AIAssistantUI() {
   const [user, setUser] = useState(null)
@@ -36,7 +35,7 @@ export default function AIAssistantUI() {
 
   const [theme, setTheme] = useState(() => {
     const saved = typeof window !== "undefined" && localStorage.getItem("theme")
-    if (saved) return saved
+    if (saved === "light" || saved === "dark") return saved
     if (typeof window !== "undefined" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches)
       return "dark"
     return "light"
@@ -44,22 +43,14 @@ export default function AIAssistantUI() {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      applyTheme(theme)
+      if (theme === "dark") {
+        document.documentElement.classList.add("dark")
+      } else {
+        document.documentElement.classList.remove("dark")
+      }
+      localStorage.setItem("theme", theme)
     }
   }, [theme])
-
-  useEffect(() => {
-    try {
-      const media = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)")
-      if (!media) return
-      const listener = (e) => {
-        const saved = localStorage.getItem("theme")
-        if (!saved) setTheme(e.matches ? "dark" : "light")
-      }
-      media.addEventListener("change", listener)
-      return () => media.removeEventListener("change", listener)
-    } catch {}
-  }, [])
 
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(() => {
@@ -192,16 +183,27 @@ export default function AIAssistantUI() {
   }
 
   async function sendMessage(convId, content, files = [], modes = { thinking: false, search: false }) {
-    if (!content.trim() && files.length === 0) return
+    console.log("[v0] AIAssistantUI sendMessage called:", { convId, content, files, modes })
+
+    if (!content || !content.trim()) {
+      console.log("[v0] AIAssistantUI sendMessage - content check:", content)
+      if (files.length === 0) {
+        console.log("[v0] AIAssistantUI sendMessage - early return, no content or files")
+        return
+      }
+    }
+
     const now = new Date().toISOString()
 
     const userMsg = {
       id: Math.random().toString(36).slice(2),
       role: "user",
-      content,
+      content: content.trim(),
       files: files.map((f) => ({ name: f.name, type: f.type, size: f.size })),
       createdAt: now,
     }
+
+    console.log("[v0] AIAssistantUI sendMessage - created userMsg:", userMsg)
 
     setConversations((prev) =>
       prev.map((c) => {
@@ -221,45 +223,51 @@ export default function AIAssistantUI() {
     setThinkingConvId(convId)
     setThinkingModes(modes)
 
-    const currentConvId = convId
-
     const conv = conversations.find((c) => c.id === convId)
-    const messages = [...(conv?.messages || []), userMsg].map((m) => ({
+    const allMessages = [...(conv?.messages || []), userMsg]
+    const apiMessages = allMessages.map((m) => ({
       role: m.role,
       content: m.content,
     }))
 
-    try {
-      const modelToUse = selectedCharacter?.model || selectedModel
-      const enhancedMessages = [...messages]
-      if (modes.thinking || modes.search) {
-        const lastMsg = enhancedMessages[enhancedMessages.length - 1]
-        let prefix = ""
-        if (modes.thinking && modes.search) {
-          prefix = "[Deep Think + Web Search Mode] Search the web for current information and analyze deeply: "
-        } else if (modes.thinking) {
-          prefix = "[Deep Think Mode] Analyze this thoroughly and provide detailed reasoning: "
-        } else if (modes.search) {
-          prefix = "[Web Search Mode] Search for current information about: "
-        }
-        lastMsg.content = prefix + lastMsg.content
-      }
+    console.log("[v0] AIAssistantUI sendMessage - apiMessages:", apiMessages)
 
-      const response = await sendChatMessage(enhancedMessages, modelToUse)
+    if (modes.thinking || modes.search) {
+      const lastMsg = apiMessages[apiMessages.length - 1]
+      let prefix = ""
+      if (modes.thinking && modes.search) {
+        prefix = "[Deep Think + Web Search Mode] Search the web for current information and analyze deeply: "
+      } else if (modes.thinking) {
+        prefix = "[Deep Think Mode] Analyze this thoroughly and provide detailed reasoning: "
+      } else if (modes.search) {
+        prefix = "[Web Search Mode] Search for current information about: "
+      }
+      lastMsg.content = prefix + lastMsg.content
+    }
+
+    try {
+      console.log("[v0] AIAssistantUI sendMessage - calling API")
+      const modelToUse = selectedCharacter?.model || selectedModel
+      const response = await sendChatMessage(apiMessages, modelToUse)
+
+      console.log("[v0] AIAssistantUI sendMessage - got API response:", response)
+
+      const asstMsg = {
+        id: Math.random().toString(36).slice(2),
+        role: "assistant",
+        content: response,
+        createdAt: new Date().toISOString(),
+      }
 
       setIsThinking(false)
       setThinkingConvId(null)
       setThinkingModes({ thinking: false, search: false })
 
+      console.log("[v0] AIAssistantUI sendMessage - adding assistant message:", asstMsg)
+
       setConversations((prev) =>
         prev.map((c) => {
-          if (c.id !== currentConvId) return c
-          const asstMsg = {
-            id: Math.random().toString(36).slice(2),
-            role: "assistant",
-            content: response,
-            createdAt: new Date().toISOString(),
-          }
+          if (c.id !== convId) return c
           const msgs = [...(c.messages || []), asstMsg]
           return {
             ...c,
@@ -271,10 +279,31 @@ export default function AIAssistantUI() {
         }),
       )
     } catch (error) {
-      console.error("[v0] Error sending message:", error)
+      console.error("[v0] AIAssistantUI sendMessage - error:", error)
       setIsThinking(false)
       setThinkingConvId(null)
       setThinkingModes({ thinking: false, search: false })
+
+      const errorMsg = {
+        id: Math.random().toString(36).slice(2),
+        role: "assistant",
+        content: `Sorry, I encountered an error: ${error.message || "Failed to get response"}. Please try again.`,
+        createdAt: new Date().toISOString(),
+      }
+
+      setConversations((prev) =>
+        prev.map((c) => {
+          if (c.id !== convId) return c
+          const msgs = [...(c.messages || []), errorMsg]
+          return {
+            ...c,
+            messages: msgs,
+            updatedAt: new Date().toISOString(),
+            messageCount: msgs.length,
+            preview: errorMsg.content.slice(0, 80),
+          }
+        }),
+      )
     }
   }
 
@@ -332,6 +361,7 @@ export default function AIAssistantUI() {
     setSelectedCharacter(character)
     setSelectedModel(character.model)
     setCurrentView("chat")
+    setSidebarOpen(false)
   }
 
   return (
@@ -356,7 +386,7 @@ export default function AIAssistantUI() {
         </div>
       </div>
 
-      <div className="mx-auto flex h-[calc(100vh-0px)] max-w-[1400px]">
+      <div className="mx-auto flex h-[calc(100vh-0px)] w-full max-w-[2000px] xl:max-w-[1800px]">
         <Sidebar
           open={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
@@ -375,6 +405,7 @@ export default function AIAssistantUI() {
           onSelect={(id) => {
             setSelectedId(id)
             setCurrentView("chat")
+            setSidebarOpen(false)
           }}
           togglePin={togglePin}
           query={query}
@@ -389,7 +420,10 @@ export default function AIAssistantUI() {
           onLogout={handleLogout}
           onSelectCharacter={handleSelectCharacter}
           currentCharacterId={selectedCharacter?.id}
-          onOpenCharacters={() => setCurrentView("characters")}
+          onOpenCharacters={() => {
+            setCurrentView("characters")
+            setSidebarOpen(false)
+          }}
         />
 
         <main className="relative flex min-w-0 flex-1 flex-col pb-16 md:pb-0">

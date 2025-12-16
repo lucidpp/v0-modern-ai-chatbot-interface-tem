@@ -221,3 +221,57 @@ a:hover {
 .glass-input:focus::before {
   opacity: 1;
 }
+
+/* Added responsive optimizations for mobile, tablet, and desktop */
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  body {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .safe-area-inset-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+}
+
+/* Tablet optimizations (768px - 1024px) */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .container {
+    max-width: 100%;
+    padding: 0 1.5rem;
+  }
+}
+
+/* Large desktop optimizations (1400px+) */
+@media (min-width: 1400px) {
+  .container {
+    max-width: 1800px;
+    margin: 0 auto;
+  }
+}
+
+/* Ultra-wide desktop optimizations (2000px+) */
+@media (min-width: 2000px) {
+  .container {
+    max-width: 2000px;
+  }
+}
+
+/* Prevent layout shift on scroll */
+html {
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Better touch interactions on mobile */
+@media (hover: none) and (pointer: coarse) {
+  button,
+  a {
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+  }
+}

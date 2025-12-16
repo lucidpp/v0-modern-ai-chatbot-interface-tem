@@ -37,13 +37,27 @@ const Composer = forwardRef(function Composer({ onSend, busy, onModeChange }, re
   }, [thinkingMode, searchMode, onModeChange])
 
   async function submit() {
-    if (!text.trim() && files.length === 0) return
-    const content = text.trim()
+    const trimmedText = text.trim()
+
+    console.log("[v0] Composer submit - text:", text)
+    console.log("[v0] Composer submit - trimmedText:", trimmedText)
+    console.log("[v0] Composer submit - files.length:", files.length)
+
+    if (!trimmedText && files.length === 0) {
+      console.log("[v0] Composer submit - early return, no content")
+      return
+    }
+
+    const content = trimmedText
     const filesToSend = [...files]
     const modes = { thinking: thinkingMode, search: searchMode }
+
+    console.log("[v0] Composer submit - calling onSend with:", { content, filesToSend, modes })
+
+    await onSend?.(content, filesToSend, modes)
+
     setText("")
     setFiles([])
-    await onSend?.(content, filesToSend, modes)
   }
 
   function handleFileSelect(e) {
